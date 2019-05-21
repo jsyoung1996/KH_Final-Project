@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- ==== mapper 기본설정 ==== -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+
+<!-- 게시판 xml -->
+
+<!-- ==== 루트 엘리먼트 & 네임스페이스 설정(프로젝트 전체내에서 유일해야 한다.) ==== -->
+<mapper namespace="board">
+
+<!-- 검색어가 없는 총게시물 건수 07.03 시작 -->
+	<select id="getTotalCount" resultType="Integer">
+		select count(*)
+		from tbl_board
+		where boardstatus = 1
+	</select>
+<!-- 검색어가 없는 총게시물 건수 07.03 끝-->
+
+<!-- 검색어가 있는 총게시물 건수 07.03 시작 -->
+	<select id="getTotalCount2" parameterType="HashMap" resultType="Integer">
+		select count(*)
+		from tbl_board
+		where boardstatus = 1
+		and ${colname} like '%'|| #{search} ||'%'
+	</select>
+<!-- 검색어가 있는 총게시물 건수 07.03 끝-->
+
+<!-- // 검색어 없는 게시글목록 보여주기 시작 07.03 -->
+	<select id="boardList" parameterType="HashMap" resultType="com.finalc.auction.model.BoardVO">
+	select boardno, fk_userid, subject, viewcount, writeday, commentcount, fk_boardno
+	from 
+	(
+	select rownum as RNO
+	     , V.boardno, V.fk_userid, V.subject, V.content, V.viewcount, V.writeday, V.commentcount, V.fk_boardno
+	from 
+	(
+	select boardno, fk_userid 
+	     , case when length(subject) > 20 then substr(subject, 1, 18)||'..'
+	            else subject end as subject
+	     , content , viewcount
+	     , to_char(writeday, 'yyyy-mm-dd hh24:mi:ss') as writeday
+	     , commentcount, fk_boardno
+	from tbl_board
+	where boardstatus = 1
+	order by boardno desc
+	) V
+	) T
+	where T.RNO >= #{startRno} and T.RNO <![CDATA[<=]]> #{endRno} 
+	</select>
+<!-- // 검색어 없는 게시글목록 보여주기 시작 07.03 -->
+	
+<!-- // 검색어 있는 게시글목록 보여주기 시작 07.03 -->
+	<select id="boardList2" parameterType="HashMap" resultType="com.finalc.auction.model.BoardVO">
+	select  boardno, fk_userid, subject, viewcount, writeday, commentcount
+              , groupno, fk_boardno, deptthno
+              , fileName, orgFilename, fileSize 
+		from 
+		(
+		   select rownum as RNO
+		        , V.boardno, V.fk_userid, V.subject, V.content, V.viewcount, V.writeday, V.commentcount
+                , V.groupno, V.fk_boardno, V.deptthno
+                , V.fileName, V.orgFilename, V.fileSize 
+		   from 
+		   (
+		     select boardno, fk_userid 
+		          , case when length(subject) > 20 then substr(subject, 1, 18)||'..'
+		            else subject end as subject
+		          , content , viewcount
+		          , to_char(writeday, 'yyyy-mm-dd hh24:mi:ss') as writeday
+		          , commentcount
+                  , groupno, fk_boardno, deptthno
+                  , fileName, orgFilename, fileSize 
+		     from tbl_board
+		     where boardstatus = 1
+		           and ${colname} like '%'|| #{search} ||'%'
+		     start with fk_boardno = 0
+             connect by prior boardno = fk_boardno
+		     order siblings by groupno desc, fk_boardno asc
+		   ) V
+		) T
+		where T.RNO >= #{startRno} and T.RNO <![CDATA[<=]]> #{endRno} 
+	</select>
+<!-- // 검색어 있는 게시글목록 보여주기 끝 07.03 -->
+
+<!-- 게시글 쓰기 스마트에디터 사용전 시작 07.03 -->
+	<insert id="write_add" parameterType="com.finalc.auction.model.BoardVO">
+	    <if test='fk_boardno.equals("")'>
+		   insert into tbl_board(boardno, fk_userid, subject, content, viewcount, writeday, boardstatus, groupno, fk_boardno, deptthno)  
+		   values(seq_board.nextval, #{fk_userid}, #{subject}, #{content}, default, default, default, #{groupno}, default, default) 
+		</if> 
+		<if test='!fk_boardno.equals("")'>
+		  insert into tbl_board(boardno, fk_userid, subject, content, viewcount, writeday, boardstatus, groupno, fk_seq, deptthno)  
+		  values(seq_board.nextval, #{fk_userid}, #{subject}, #{content}, default, default, default, #{groupno}, #{fk_boardno}, #{deptthno}+1) 
+		</if>	
+	</insert>
+<!-- 게시글 쓰기 스마트에디터 사용전 끝 07.03 -->
+	
+	<select id="getGroupMaxno" resultType="Integer">
+	    select nvl(max(groupno), 0)
+		from tbl_board
+	</select>
+
+<!-- 게시글 쓰기 스마트에디터 사용 시작 07.04 -->
+	<insert id="write_withFile" parameterType="com.finalc.auction.model.BoardVO">
+	    <if test='fk_boardno.equals("")'>
+		  insert into tbl_board(boardno, fk_userid, subject, content, viewcount, writeday, boardstatus, groupno, fk_boardno, deptthno, fileName, orgFilename, fileSize)  
+		  values(seq_board.nextval, #{fk_userid}, #{subject}, #{content}, default, default, default, #{groupno}, default, default, #{fileName}, #{orgFilename}, #{fileSize}) 
+		</if> 
+		<if test='!fk_boardno.equals("")'>
+		  insert into tbl_board(boardno, fk_userid, subject, content, viewcount, writeday, boardstatus, groupno, fk_boardno, deptthno, fileName, orgFilename, fileSize)  
+		  values(seq_board.nextval, #{fk_userid}, #{subject}, #{content}, default, default, default, #{groupno}, #{fk_boardno}, #{deptthno}+1, #{fileName}, #{orgFilename}, #{fileSize})     
+		</if>	
+	</insert>
+<!-- 게시글 쓰기 스마트에디터 사용 끝 07.04 -->
+
+<!-- 게시글 1개보기 (조회수 증가, 증가없이 07.05 시작) -->
+	<select id="getWriteView" parameterType="String" resultType="com.finalc.auction.model.BoardVO">
+		select boardno, fk_userid, subject, content, viewcount,
+			   to_char(writeday, 'yyyy-mm-dd hh24:mi:ss') as writeday, groupno,
+			   fk_boardno, deptthno, fileName, orgFilename, fileSize
+		from tbl_board
+		where boardstatus = 1 and boardno = #{boardno}
+	</select>
+<!-- 게시글 1개보기 (조회수 증가, 증가없이 07.05 끝) -->
+
+<!-- 게시글 1개 볼때마다 1증가(07.05 시작) -->
+	<update id="setAddViewCount" parameterType="String">
+		update tbl_board set viewcount = viewcount + 1
+		where boardstatus = 1 and boardno = #{boardno}
+	</update>
+<!-- 게시글 1개 볼때마다 1증가(07.05 끝) -->
+
+<!-- 댓글보기 (07.05 시작) -->
+	<select id="commentList" parameterType="String" resultType="com.finalc.auction.model.CommentVO">
+		select commentno, fk_userid, cm_content, 
+	   		   to_char(cm_writeday, 'yyyy-mm-dd hh24:mi:ss') as cm_writeday,
+	           fk_boardno, cm_status
+		from tbl_comment
+		where fk_boardno = #{boardno}
+		order by commentno desc
+	</select>
+<!-- 댓글보기 (07.05 끝) -->
+	
+	<select id="getReviewByActdnum" parameterType="String" resultType="com.finalc.auction.model.HugiBoardVO">
+		select ep_boardno, fk_userid, fk_actdnum, ep_content, to_char(ep_writeday, 'yyyy-mm-dd hh24:mi:ss') as ep_writeday, ep_satisfaction, ep_boardstatus
+		from tbl_hugiboard
+		where fk_actdnum = #{actdnum}
+	</select>
+	
+	<insert id="reviewRegist" parameterType="HashMap">
+		insert into tbl_hugiboard(ep_boardno, fk_userid, fk_actdnum, ep_content, ep_writeday, ep_satisfaction, ep_boardstatus)
+		values(seq_hugiboard.nextval, #{fk_userid}, #{actdnum}, #{ep_content}, default, #{ep_satisfaction}*2, default)
+	</insert>
+	
+<!-- 게시글 수정페이지 완료 (07.06 12:33 시작) -->
+	<update id="writeedit" parameterType="com.finalc.auction.model.BoardVO">
+		update tbl_board set subject = #{subject}, content = #{content}
+		where boardno = #{boardno}
+	</update>
+<!-- 게시글 수정페이지 완료 (07.06 12:35끝) -->
+
+<!-- 게시글 삭제하기(07.06 17:31 시작) -->
+ 	<update id="deleteContent" parameterType="HashMap">
+	 	update tbl_board set boardstatus = 0
+	 	where boardno = #{boardno}
+	</update>
+<!-- 게시글 삭제하기(07.06 17:31 끝) -->
+    
+<!-- 게시글에 댓글이 있는지 없는지 확인(07.06 17:30 시작) -->
+	<select id="isExistsComment" parameterType="HashMap" resultType="Integer"> 
+	    select count(*)
+		from tbl_comment
+		where fk_boardno = #{boardno}
+	</select>
+<!-- 게시글에 댓글이 있는지 없는지 확인(07.06 17:30 끝) -->
+	
+<!-- 게시글에 댓글 삭제(07.06 17:31 시작) -->
+	<update id="deleteComment" parameterType="HashMap">
+	     update tbl_comment set cm_status = 0
+	     where fk_boardno = #{boardno}
+	</update>
+<!-- 게시글에 댓글 삭제(07.06 17:31 끝) -->
+	
+<!-- 댓글 쓰기(07.07 12:00 시작) -->
+	<insert id="writeComment" parameterType="com.finalc.auction.model.CommentVO">
+		insert into tbl_comment(commentno, fk_userid, cm_content, cm_writeday, fk_boardno, cm_status)
+		values(seq_comment.nextval, #{fk_userid}, #{cm_content}, default, #{fk_boardno}, default)
+	</insert>
+<!-- 댓글 쓰기(07.07 12:03 끝) -->
+	
+<!-- 댓글쓰기 후 댓글갯수 1증가(07.07 12:09 시작) -->
+	<update id="updateCommentCount" parameterType="String">
+		update tbl_board set commentcount = commentcount +1
+		where boardno = #{fk_board}
+	</update>
+<!-- 댓글쓰기 후 댓글갯수 1증가(07.07 12:11 끝) -->
+
+<!-- 신상 경매 리스트 -->
+	<select id="newAuctionList" resultType="com.finalc.auction.model.AuctionVO">
+		select actnum, fk_cdnum, actname, actimage, orgfilename, filesize,
+				filename, actdnum, fk_actnum, fk_usernum, actd_price,
+				actd_qty, actd_status, actd_content, actd_lowertenderprice,
+			 	to_char(actd_startday, 'yyyy-mm-dd') as actd_startday,
+			 	to_char(actd_endday, 'yyyy-mm-dd hh24:mi:ss') as actd_endday, startprice
+		from tbl_auction A join tbl_auction_detail B
+		on A.actnum = B.fk_actnum
+		where actd_status = 1 
+		and to_char(actd_startday, 'yyyy-mm-dd') > to_char(sysdate - to_dsinterval('003 00:00:00'), 'yyyy-mm-dd')
+		order by actd_startday desc
+	</select>
+<!-- 신상 경매 리스트 -->
+
+<!-- 일반 경매 리스트 -->
+	<select id="auctionList" resultType="com.finalc.auction.model.AuctionVO">
+		select actnum, fk_cdnum, actname, actimage, orgfilename, filesize,
+				filename, actdnum, fk_actnum, fk_usernum, actd_price,
+				actd_qty, actd_status, actd_content, actd_lowertenderprice,
+			 	to_char(actd_startday, 'yyyy-mm-dd') as actd_startday,
+			 	to_char(actd_endday, 'yyyy-mm-dd hh24:mi:ss') as actd_endday, startprice
+		from tbl_auction A join tbl_auction_detail B
+		on A.actnum = B.fk_actnum
+		where actd_status = 1 
+		order by actd_startday desc
+	</select>
+<!-- 일반 경매 리스트 -->
+
+	<!-- 베스트 경매 리스트 -->
+	<select id="bestAuctionList" resultType="com.finalc.auction.model.AuctionVO">
+		select actnum, fk_cdnum, actname, actimage, orgfilename, filesize,
+				filename, actdnum, fk_actnum, fk_usernum, actd_price,
+				actd_qty, actd_status, actd_content, actd_lowertenderprice,
+			 	to_char(actd_startday, 'yyyy-mm-dd') as actd_startday,
+			 	to_char(actd_endday, 'yyyy-mm-dd hh24:mi:ss') as actd_endday, startprice
+	    from ( select rownum, X.actnum, X.fk_cdnum, X.actname, X.actimage, X.orgfilename, X.filesize,
+                        X.filename, X.actdnum, X.fk_actnum, X.fk_usernum, X.actd_price,
+                        X.actd_qty, X.actd_status, X.actd_content, X.actd_lowertenderprice,
+                        X.actd_startday, X.actd_endday, X.startprice, Y.counts
+            from (select actnum, fk_cdnum, actname, actimage, orgfilename, filesize,
+                        filename, actdnum, fk_actnum, fk_usernum, actd_price,
+                        actd_qty, actd_status, actd_content, actd_lowertenderprice,
+                        actd_startday, actd_endday, startprice
+                  from tbl_auction A join tbl_auction_detail B
+                  on A.actnum = B.fk_actnum
+                  where actd_status = 1
+                  ) X join    
+                  (select A.fk_actnum, count(*) as counts
+                  from tbl_joinaclist A join tbl_auction_detail B
+                  on A.fk_actnum = B.fk_actnum
+                  where B.ACTD_STATUS = 1
+                  group by A.fk_actnum
+                  ) Y
+            on X.FK_ACTNUM = Y.FK_ACTNUM
+            where 1 <![CDATA[<=]]> rownum and rownum <![CDATA[<=]]> 5
+            order by Y.counts desc, actnum asc
+            ) V
+	</select>
+	<!-- 베스트 경매 리스트 -->
+	
+	<!-- 안팔리는 경매리스트 -->
+	<select id="worstAuctionList" resultType="com.finalc.auction.model.AuctionVO">
+		select actnum, fk_cdnum, actname, actimage, orgfilename, filesize,
+				filename, actdnum, fk_actnum, fk_usernum, actd_price,
+				actd_qty, actd_status, actd_content, actd_lowertenderprice,
+			 	to_char(actd_startday, 'yyyy-mm-dd') as actd_startday,
+			 	to_char(actd_endday, 'yyyy-mm-dd hh24:mi:ss') as actd_endday, startprice
+	    from ( select rownum, X.actnum, X.fk_cdnum, X.actname, X.actimage, X.orgfilename, X.filesize,
+                        X.filename, X.actdnum, X.fk_actnum, X.fk_usernum, X.actd_price,
+                        X.actd_qty, X.actd_status, X.actd_content, X.actd_lowertenderprice,
+                        X.actd_startday, X.actd_endday, X.startprice, Y.counts
+            from (select actnum, fk_cdnum, actname, actimage, orgfilename, filesize,
+                        filename, actdnum, fk_actnum, fk_usernum, actd_price,
+                        actd_qty, actd_status, actd_content, actd_lowertenderprice,
+                        actd_startday, actd_endday, startprice
+                  from tbl_auction A join tbl_auction_detail B
+                  on A.actnum = B.fk_actnum
+                  where actd_status = 1
+                  ) X join    
+                  (select A.fk_actnum, count(*) as counts
+                  from tbl_joinaclist A join tbl_auction_detail B
+                  on A.fk_actnum = B.fk_actnum
+                  where B.ACTD_STATUS = 1
+                  group by A.fk_actnum
+                  ) Y
+            on X.FK_ACTNUM = Y.FK_ACTNUM
+            where 1 <![CDATA[<=]]> rownum and rownum <![CDATA[<=]]> 5
+            order by Y.counts asc, actnum asc
+            ) V
+	</select>
+	<!-- 안팔리는 경매리스트 -->
+
+</mapper>

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- ==== mapper 기본설정 ==== -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd"> 
+
+<!-- ==== 루트 엘리먼트 & 네임스페이스 설정(프로젝트 전체내에서 유일해야 한다.) ==== -->
+<mapper namespace="login">
+	<select id="getLoginMember" parameterType="HashMap" resultType="com.finalc.auction.model.MemberVO">
+		select userid, passwd, email, username, email, usernum, hp1
+		     , hp2, hp3, addr1, addr2, user_status, gender, birth, grade, coin
+		from
+		(
+		select *
+		from tbl_member A join TBL_MEMBER_DETAIL B
+		on A.userid = B.fk_userid
+		)V
+		where user_status = 1 and
+		userid = #{userid} and
+		passwd = #{passwd}
+	</select>
+	
+	<select id="idCheck" parameterType="String" resultType="Integer">
+		select count(*)
+		from tbl_member
+		where userid = #{userid}
+	</select>
+	
+	<insert id="memberRegist" parameterType="HashMap">
+		insert into tbl_member(userid, passwd, user_status)
+		values(#{userid}, #{pwd}, default)
+	</insert>
+	
+	<insert id="memberRegistDetail" parameterType="HashMap">
+		insert into tbl_member_detail(usernum, fk_userid, username, birth, gender, email, zipcode, addr1, addr2, hp1, hp2, hp3)
+		values(seq_member_detail.nextval, (select userid from tbl_member where userid = #{userid}), #{name}, #{birth}, #{gender}, #{email1} || '@' || #{email2}, to_number(#{zipcode}), #{addr1}, #{addr2}, #{hp1},  #{hp2},  #{hp3})
+	</insert>
+	 
+	<resultMap type="HashMap" id="zipcodeMap">
+		<result property="zipcode" column="zipcode" javaType="String" />
+		<result property="address" column="address" javaType="String" />
+	</resultMap> 
+	 
+	<select id="serchZipcode" parameterType="HashMap" resultMap="zipcodeMap">
+		select zipcode, sido||' '||sigungu||' '||eupmyun||' '||doro||' '||building||' '||buildname||' '||dongname||' '||riname||' '||dong2name AS address
+		from tbl_zipcode
+		where sido||' '||sigungu||' '||eupmyun||' '||doro||' '||building||' '||buildname||' '||dongname||' '||riname||' '||dong2name like '%' || #{sido} || '%'
+	</select>
+	
+	<update id="updatePwdUser" parameterType="HashMap">
+		update tbl_member set passwd = #{pwd}
+		where userid = #{userid}
+	</update>
+	
+	<select id="isUserExists" parameterType="String" resultType="Integer">
+		select count(*)
+		from tbl_member A join tbl_member_detail B
+		on A.userid = B.fk_userid
+		where userid = #{userid}
+	</select>
+	 
+	<update id="memberEdit" parameterType="HashMap">
+		update tbl_member_detail set email = #{email1}||'@'||#{email2}, hp1 = #{hp1}, hp2 = #{hp2}, hp3 = #{hp3}, zipcode = #{zipcode}, addr1 = #{addr1}, addr2 = #{addr2} 
+		where fk_userid = #{userid}
+	</update>
+	
+	<resultMap type="HashMap" id="getBuyListMap">
+		<result property="ACTIMAGE" column="actimage" javaType="String" />
+		<result property="JOINACTNUM" column="joinactnum" javaType="String" />
+		<result property="ACTNUM" column="actnum" javaType="String" />
+		<result property="ACTNAME" column="actname" javaType="String" />
+		<result property="USERNUM" column="usernum" javaType="String" />
+		<result property="TENDERDAY" column="tenderday" javaType="String" />
+		<result property="TENDERPRICE" column="tenderprice" javaType="String" />
+		<result property="ACTD_ENDDAY" column="actd_endday" javaType="String" />
+		<result property="ACTDNUM" column="actdnum" javaType="String" />
+	</resultMap>
+	
+	<select id="JoinList" parameterType="HashMap" resultMap="getBuyListMap">
+		select actimage, joinactnum, actnum, actname, usernum, tenderday, tenderprice, actd_endday, actdnum
+		from
+		(
+		select C.actimage, to_char(A.joinactnum) AS joinactnum, to_char(A.fk_actnum) AS actnum, C.actname, to_char(A.fk_usernum) AS usernum
+			 , to_char(A.tenderday, 'yyyy-mm-dd') AS tenderday
+			 , A.tenderprice, to_char(B.actd_endday, 'yyyy-mm-dd') AS actd_endday, B.actdnum
+		from tbl_joinaclist A join tbl_auction_detail B
+		on A.fk_actnum = B.fk_actnum
+		join tbl_auction C
+		on A.fk_actnum = C.actnum
+		where A.fk_usernum = #{usernum}
+		)V
+		
+	</select>
+	
+	<select id="getTotalCount" resultType="Integer">
+		select count(*)
+		from tbl_joinaclist
+		where fk_usernum = #{usernum}
+	</select>
+	
+	<resultMap type="HashMap" id="getAuctionListMap">
+		<result property="ACTIMAGE" column="actimage" javaType="String" />
+		<result property="ACTNUM" column="actnum" javaType="String" />
+		<result property="ACTDNUM" column="actdnum" javaType="String" />
+		<result property="ACTNAME" column="actname" javaType="String" />
+		<result property="ACTD_STARTDAY" column="actd_startday" javaType="String" />
+		<result property="ACTD_ENDDAY" column="actd_endday" javaType="String" />
+	</resultMap>
+	
+	<select id="AuctionList" parameterType="HashMap" resultMap="getAuctionListMap">
+		select actnum, actimage, actname, actd_startday, actd_endday, actdnum
+		from
+		(
+		select A.actnum, A.actimage, A.actname, B.actd_startday, B.actd_endday, B.actdnum
+		from tbl_auction A join tbl_auction_detail B
+		on A.actnum = B.fk_actnum
+		where B.fk_usernum = #{usernum}
+		)V
+		
+	</select>
+	
+</mapper>
